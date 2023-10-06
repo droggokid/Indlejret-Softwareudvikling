@@ -1,0 +1,14 @@
+CXX=arm-rpizw-g++
+EXECUTABLE = hello
+
+.PHONY: all
+all: $(EXECUTABLE)
+
+$(EXECUTABLE): hello.cpp
+        $(CXX) -o $(EXECUTABLE) hello.cpp
+clean: 
+        rm -f $(EXECUTABLE)
+
+help: 
+        @echo "Available targets: hello" 
+        @echo "help"
