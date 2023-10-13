@@ -3,8 +3,8 @@
 #include <unistd.h>
 
 pthread_mutex_t m;
-pthread_cond_t c;
-bool waitForPermissionEnter, waitForPermissionExit, carArrive, carExit = false;
+pthread_cond_t enter, leave;
+bool waitForPermissionEnter = false, waitForPermissionExit = false, carArrive = false, carExit = false;
 
 void *carThread(void *arg)
 {
@@ -13,27 +13,32 @@ void *carThread(void *arg)
         pthread_mutex_lock(&m);
         carArrive = true;
         printf("Car waiting to enter.\n");
-        pthread_cond_signal(&c);
+        pthread_cond_signal(&enter);
 
         while (waitForPermissionEnter == false)
         {
-            pthread_cond_wait(&c, &m);
+            pthread_cond_wait(&enter, &m);
         }
-        carArrive = false;
         printf("Car in parking lot\n");
-        usleep(5000);
+        carArrive = false;
+        pthread_cond_signal(&enter);
+
+        sleep(5);
+
         printf("Car waiting to leave\n");
         carExit = true;
-        pthread_cond_signal(&c);
+        pthread_cond_signal(&leave);
 
         while (waitForPermissionExit == false)
         {
-            pthread_cond_wait(&c, &m);
+            pthread_cond_wait(&leave, &m);
         }
-        carExit = false;
         printf("Car left parking lot\n");
+        carExit = false;
+        pthread_cond_signal(&leave);
+
         pthread_mutex_unlock(&m);
-        usleep(1000);
+        sleep(1);
     }
 }
 
@@ -45,12 +50,18 @@ void *entryGuardThread(void *arg)
 
         while (carArrive == false)
         {
-            pthread_cond_wait(&c, &m);
+            pthread_cond_wait(&enter, &m);
         }
         printf("Enter Guard: car allowed to enter\n");
         waitForPermissionEnter = true;
-        pthread_cond_signal(&c);
+        pthread_cond_signal(&enter);
 
+        while (carArrive)
+        {
+            pthread_cond_wait(&enter, &m);
+        }
+        printf("Enter Guard: entered\n");
+        waitForPermissionEnter = false;
         pthread_mutex_unlock(&m);
     }
 }
@@ -63,12 +74,18 @@ void *exitGuardThread(void *arg)
 
         while (carExit == false)
         {
-            pthread_cond_wait(&c, &m);
+            pthread_cond_wait(&leave, &m);
         }
         printf("Exit Guard: car allowed to leave\n");
         waitForPermissionExit = true;
-        pthread_cond_signal(&c);
+        pthread_cond_signal(&leave);
 
+        while (carExit)
+        {
+            pthread_cond_wait(&leave, &m);
+        }
+        printf("Exit Guard: car left lot\n");
+        waitForPermissionExit = false;
         pthread_mutex_unlock(&m);
     }
 }
@@ -76,7 +93,8 @@ void *exitGuardThread(void *arg)
 int main()
 {
     pthread_t car1, exitGuard, enterGuard;
-
+    pthread_cond_init(&enter, NULL);
+    pthread_cond_init(&exit, NULL);
     pthread_mutex_init(&m, NULL);
 
     pthread_create(&enterGuard, NULL, entryGuardThread, NULL);
