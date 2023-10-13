@@ -4,85 +4,78 @@
 
 pthread_mutex_t m;
 pthread_cond_t c;
-bool waitForPermissionEnter, waitForPermissionExit, carArrive = false;
+bool waitForPermissionEnter, waitForPermissionExit, carArrive, carExit = false;
 
 void *CarThread(void *arg)
 {
     pthread_mutex_lock(&m);
-    bool carArrive = true;
+    carArrive = true;
     pthread_cond_signal(&c);
-    
-    while (waitForPermissionEnter == false){
-        pthread_cond_wait(&c,&m);
+
+    while (waitForPermissionEnter == false)
+    {
+        pthread_cond_wait(&c, &m);
     }
+    carArrive = false;
 
-    usleep(500);
+    usleep(5000);
 
-    bool carArrive = false;
+    bool carExit = true;
     pthread_cond_signal(&c);
-    
-    while (waitForPermissionExit == false){
-        pthread_cond_wait(&c,&m);
+
+    while (waitForPermissionExit == false)
+    {
+        pthread_cond_wait(&c, &m);
     }
 
     pthread_mutex_unlock(&m);
     pthread_exit(NULL);
     return NULL;
-    //enterPL;
-    //carsInPL++;
-    //carWaiting = false;
-    //condSignal(c);
-    //unlock(m);
-
-   
+    // enterPL;
+    // carsInPL++;
+    // carWaiting = false;
+    // condSignal(c);
+    // unlock(m);
 }
 
-void entryGuardThread()
+void *entryGuardThread(void *arg)
 {
     pthread_mutex_lock(&m);
 
-    while(carArrive == false){
-        pthread_cond_wait(&c,&m);
+    while (carArrive == false)
+    {
+        pthread_cond_wait(&c, &m);
     }
     waitForPermissionEnter = true;
     pthread_cond_signal(&c);
 
-    while(carWaiting){
-        condWait(c,m);
-
-    closeEntryGate();
-    entryGateOpen = false;
-
-    unlock(m);
+    pthread_mutex_unlock(&m);
 }
 
-void exitGuardThread()
+void *exitGuardThread(void *arg)
 {
-    lock(m);
+    pthread_mutex_lock(&m);
 
-    while(!carWaiting){
-        condWait(c,m);
+    while (carExit == false)
+    {
+        pthread_cond_wait(&c, &m);
     }
 
-    openExitGate();
-    exitGateOpen = true;
+    waitForPermissionExit = true;
+    pthread_cond_signal(&c);
 
-    condSignal(c);
-    while(carWaiting){
-        condWait(c,m);
-
-    closeEntryGate();
-    entryGateOpen = false;
-
-    unlock(m);
+    pthread_mutex_unlock(&m);
 }
 
-int main() {
-    pthread_t car1;
+int main()
+{
+    pthread_t car1, exitGuardThread, enterGuardThread;
+
+    pthread_mutex_init(&m, NULL);
 
     pthread_create(&car1, NULL, CarThread, NULL);
 
-    pthread_join(car1, NULL); 
+    pthread_join(car1, NULL);
 
     return 0;
 }
