@@ -4,11 +4,12 @@
 #include <time.h>
 #include <stdlib.h>
 
-#DEFINE CAP 1
+#define CAP 1
 
 int freeSpaces = CAP;
+int entryQueueCount = 0;
 pthread_mutex_t m;
-pthread_cond_t enter, leave;
+pthread_cond_t enter, leave, spaces, queue;
 bool waitForPermissionEnter = false,
      waitForPermissionExit = false,
      carArrive = false,
@@ -22,7 +23,8 @@ void *carThread(void *arg)
         pthread_mutex_lock(&m);
         carArrive = true;
         printf("Car %d waiting to enter.\n", *id);
-        pthread_cond_signal(&enter);
+        entryQueueCount++;
+        pthread_cond_wait(&queue, &m);
 
         while (waitForPermissionEnter == false)
         {
@@ -52,7 +54,7 @@ void *carThread(void *arg)
         pthread_cond_signal(&leave);
 
         pthread_mutex_unlock(&m);
-        sleep(1);
+        sleep(time);
     }
 }
 
@@ -62,30 +64,41 @@ void *entryGuardThread(void *arg)
     {
         waitForPermissionEnter = false;
         pthread_mutex_lock(&m);
-        if (freeSpaces >= CAP)
+        if (freeSpaces >= CAP && entryQueueCount > 0)
         {
-            while (carArrive == false)
+            while (freeSpaces >= CAP && entryQueueCount > 0)
             {
-                pthread_cond_wait(&enter, &m);
+                while (carArrive == false)
+                {
+                    pthread_cond_wait(&enter, &m);
+                    sleep(1);
+                }
                 sleep(1);
-            }
-            sleep(1);
-            printf("Enter Guard: car allowed to enter\n");
-            sleep(1);
-            waitForPermissionEnter = true;
-            pthread_cond_signal(&enter);
-            freeSpaces--;
+                printf("Enter Guard: car allowed to enter\n");
+                sleep(1);
+                waitForPermissionEnter = true;
+                pthread_cond_signal(&enter);
+                freeSpaces--;
 
-            while (carArrive)
-            {
-                pthread_cond_wait(&enter, &m);
+                entryQueueCount--;
+                pthread_cond_signal(&queue);
+
+                while (carArrive)
+                {
+                    pthread_cond_wait(&enter, &m);
+                }
             }
         }
         else
         {
-            printf("Parking lot full");
+            printf("Parking lot full\n");
+            while (freeSpaces < CAP)
+            {
+                pthread_cond_wait(&spaces, &m);
+                sleep(1);
+            }
         }
-
+        waitForPermissionEnter = false;
         pthread_mutex_unlock(&m);
     }
 }
@@ -108,6 +121,7 @@ void *exitGuardThread(void *arg)
         waitForPermissionExit = true;
         pthread_cond_signal(&leave);
         freeSpaces++;
+        pthread_cond_signal(&spaces);
 
         while (carExit)
         {
