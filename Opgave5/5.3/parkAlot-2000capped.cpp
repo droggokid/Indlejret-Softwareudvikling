@@ -6,7 +6,7 @@
 
 #define CAP 1
 
-int cars = 1;
+int cars = 3;
 int freeSpaces = CAP;
 pthread_mutex_t m;
 pthread_cond_t enter, leave, spaces;
@@ -139,7 +139,7 @@ int main()
 
     for (int i = 0; i < cars; i++)
     {
-        carIDs[i] = i + 1;
+        carIDs[i] = i+1;
         pthread_create(&carArray[i], NULL, carThread, &carIDs[i]);
     }
 
@@ -149,6 +149,7 @@ int main()
     for (int i = 0; i < cars; i++)
     {
         pthread_join(carArray[i], NULL);
+        
     }
 
     return 0;
