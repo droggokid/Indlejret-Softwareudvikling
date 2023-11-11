@@ -1,0 +1,80 @@
+Mutex        m;
+Condition    c;
+spacesPL    #;
+
+void CarThread()
+{
+    lock(m);
+    waitAtEntryGate();
+    carWaiting = true;
+    condSignal(c);
+
+    while (!whatWeAreWaitingFor){
+        condWait(c,m);
+    }
+
+    enterPL;
+    carsInPL++;
+    carWaiting = false;
+    condSignal(c);
+    unlock(m);
+
+    waitRandomTime();
+
+    waitAtExitGate();
+    lock(m);
+    carWaiting = true;
+    condSignal(c);
+
+    while (!whatWeAreWaitingFor){
+        condWait(c,m);
+    }
+
+    ExitPL;
+    carWaiting = false;
+    condSignal(c);
+
+    unlock(m);
+}
+
+void entryGuardThread()
+{
+    lock(m);
+
+    while(!carWaiting){
+        condWait(c,m);
+    }
+
+    openEntryGate();
+    entryGateOpen = true;
+
+    condSignal(c);
+    while(carWaiting){
+        condWait(c,m);
+
+    closeEntryGate();
+    entryGateOpen = false;
+
+    unlock(m);
+}
+
+void exitGuardThread()
+{
+    lock(m);
+
+    while(!carWaiting){
+        condWait(c,m);
+    }
+
+    openExitGate();
+    exitGateOpen = true;
+
+    condSignal(c);
+    while(carWaiting){
+        condWait(c,m);
+
+    closeEntryGate();
+    entryGateOpen = false;
+
+    unlock(m);
+}
